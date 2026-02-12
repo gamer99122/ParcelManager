@@ -1,89 +1,104 @@
 // ===== Google Sheets 整合設定 =====
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz_DRbehgkkpLHZw0kFIVNafkbSJQTynYfkWATSKlYyHnFKPfGjwf57VLvkbR9ltp1o/exec';
+const SHEET_ID = '1Vv1NVFUnHMyu2998_kzMjiRAVaqW9WRgW7-EUAruRlE';
+const SHEET_NAME = 'Sheet1';
 
 // ===== 從 Google Sheet 讀取資料 =====
 async function loadDataFromSheet() {
     try {
         console.log('正在從 Google Sheet 讀取資料...');
 
-        // 使用 GET 請求避免 CORS 問題
-        const url = APPS_SCRIPT_URL + '?action=read';
-        const response = await fetch(url);
-        const jsonText = await response.text();
-        const result = JSON.parse(jsonText);
+        // 使用 Google Sheets CSV 匯出 URL（避免 CORS）
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
+        const response = await fetch(csvUrl);
+        const csvText = await response.text();
 
-        if (result.success) {
-            shoppingList = result.data || [];
-            console.log(`成功讀取 ${shoppingList.length} 個項目`);
+        // 解析 CSV
+        const lines = csvText.split('\n');
+        if (lines.length <= 1) {
+            shoppingList = [];
             renderPage();
-            showNotification('✅ 資料已從 Google Sheet 讀取');
-        } else {
-            console.error('讀取失敗:', result.message);
-            showNotification('❌ 讀取資料失敗: ' + result.message);
+            showNotification('✅ 資料已從 Google Sheet 讀取（無資料）');
+            return;
         }
+
+        // 跳過標題行，解析資料
+        shoppingList = [];
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+
+            const cells = parseCSV(line);
+            if (cells.length < 8 || (!cells[0] && !cells[1])) continue;
+
+            const item = {
+                id: i,
+                date: cells[0] || '',
+                sequence: cells[1] || '',
+                images: [
+                    cells[2] || '',
+                    cells[3] || '',
+                    cells[4] || ''
+                ],
+                brand: cells[5] || '',
+                notes: cells[6] || '',
+                shipment: cells[7] || '空白'
+            };
+
+            shoppingList.push(item);
+        }
+
+        console.log(`成功讀取 ${shoppingList.length} 個項目`);
+        renderPage();
+        showNotification('✅ 資料已從 Google Sheet 讀取');
     } catch (error) {
         console.error('讀取錯誤:', error);
         showNotification('❌ 連接錯誤: ' + error.message);
     }
 }
 
-// ===== 更新項目到 Google Sheet =====
+// ===== 解析 CSV 行 =====
+function parseCSV(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+
+        if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+
+    result.push(current.trim());
+    return result;
+}
+
+// ===== 更新項目到本地（提示手動編輯 Google Sheet） =====
 async function updateItemToSheet(item) {
     try {
-        console.log('正在更新項目到 Google Sheet...');
-
-        const response = await fetch(APPS_SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify({
-                action: 'update',
-                item: item
-            })
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            console.log('項目已更新');
-            return true;
-        } else {
-            console.error('更新失敗:', result.message);
-            showNotification('❌ 更新失敗: ' + result.message);
-            return false;
-        }
+        console.log('項目已在本地更新');
+        showNotification('⚠️ 已更新本地，請手動編輯 Google Sheet 以保存');
+        return true;
     } catch (error) {
         console.error('更新錯誤:', error);
-        showNotification('❌ 更新錯誤: ' + error.message);
         return false;
     }
 }
 
-// ===== 從 Google Sheet 刪除項目 =====
+// ===== 刪除項目（本地刪除） =====
 async function deleteItemFromSheet(id) {
     try {
-        console.log('正在從 Google Sheet 刪除項目...');
-
-        const response = await fetch(APPS_SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify({
-                action: 'delete',
-                id: id
-            })
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            console.log('項目已刪除');
-            await loadDataFromSheet();
-            return true;
-        } else {
-            console.error('刪除失敗:', result.message);
-            showNotification('❌ 刪除失敗: ' + result.message);
-            return false;
-        }
+        console.log('項目已本地刪除');
+        showNotification('⚠️ 已刪除本地，請在 Google Sheet 中手動刪除該列');
+        return true;
     } catch (error) {
         console.error('刪除錯誤:', error);
-        showNotification('❌ 刪除錯誤: ' + error.message);
         return false;
     }
 }
