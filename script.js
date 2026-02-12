@@ -6,9 +6,10 @@ const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 // ===== 從 Google Sheet 讀取資料 =====
 async function loadDataFromSheet() {
     try {
-        console.log('正在從 Google Sheet 讀取資料 (JSONP 即時模式)...');
-
-        // 使用 JSONP 直接從 Apps Script 讀取，避開 Sheet2API 的快取問題
+        console.log('正在從 Google Sheet 讀取最新資料...');
+        // 每次讀取前清空舊列表，避免混淆
+        shoppingList = [];
+        
         const result = await callAppsScript({ action: 'read' });
 
         if (result.success && result.data) {
@@ -22,35 +23,16 @@ async function loadDataFromSheet() {
                 shipment: String(item.shipment || '空白')
             }));
             
-            console.log(`成功讀取 ${shoppingList.length} 個項目`);
+            console.log(`成功同步最新資料：${shoppingList.length} 個項目`);
             renderPage();
-            showNotification('✅ 資料已成功同步 (最新版本)');
+            showNotification('✅ 資料已同步');
         } else {
             throw new Error(result.message || '讀取失敗');
         }
     } catch (error) {
         console.error('讀取錯誤:', error);
-        
-        // 只有在 JSONP 失敗時，才嘗試使用 Sheet2API 作為備援
-        console.warn('JSONP 讀取失敗，嘗試備援方案 (Sheet2API)...');
-        try {
-            const response = await fetch(SHEET2API_URL);
-            const data = await response.json();
-            if (data && Array.isArray(data)) {
-                shoppingList = data.map((row, index) => ({
-                    id: index + 1,
-                    date: String(row['收件日期'] || row['日期'] || ''),
-                    sequence: String(row['序號'] || ''),
-                    images: [String(row['圖片1'] || ''), String(row['圖片2'] || ''), String(row['圖片3'] || '')],
-                    brand: String(row['商家'] || row['品牌'] || ''),
-                    notes: String(row['備註'] || ''),
-                    shipment: String(row['寄送狀態'] || '空白')
-                }));
-                renderPage();
-            }
-        } catch (backupError) {
-            showNotification('❌ 無法連接到資料庫');
-        }
+        showNotification('❌ 無法同步最新資料: ' + error.message);
+        renderPage(); // 即使失敗也渲染一次，顯示空白狀態而非舊資料
     }
 }
 
@@ -177,127 +159,8 @@ async function deleteItemFromSheet(id) {
     }
 }
 
-// 模擬資料 (初始版本)
-let shoppingList = [
-    {
-        id: 1,
-        date: '20250914',
-        sequence: '1',
-        images: ['', '', ''],
-        brand: '',
-        notes: '',
-        shipment: '空白',
-        shipment: '空白'
-    },
-    {
-        id: 2,
-        date: '20251124',
-        sequence: '1',
-        images: ['', '', ''],
-        brand: '',
-        notes: '',
-        shipment: '空白'
-    },
-    {
-        id: 3,
-        date: '20251124',
-        sequence: '2',
-        images: ['', '', ''],
-        brand: '',
-        notes: '',
-        shipment: '空白'
-    },
-    {
-        id: 4,
-        date: '20251124',
-        sequence: '3',
-        images: ['', '', ''],
-        brand: '',
-        notes: '',
-        shipment: '空白'
-    },
-    {
-        id: 5,
-        date: '20251220',
-        sequence: '1',
-        images: ['', '', ''],
-        brand: '',
-        notes: '',
-        shipment: '空白'
-    },
-    {
-        id: 6,
-        date: '20251223',
-        sequence: '1',
-        images: ['', '', ''],
-        brand: '',
-        notes: '',
-        shipment: '空白'
-    },
-    {
-        id: 7,
-        date: '20251223',
-        sequence: '2',
-        images: ['', '', ''],
-        brand: '',
-        notes: '',
-        shipment: '空白'
-    },
-    {
-        id: 8,
-        date: '20260107',
-        sequence: '1',
-        images: ['', '', ''],
-        brand: '',
-        notes: '',
-        shipment: '空白'
-    },
-    {
-        id: 9,
-        date: '20260108',
-        sequence: '1',
-        images: ['', '', ''],
-        brand: '',
-        notes: '',
-        shipment: '空白'
-    },
-    {
-        id: 10,
-        date: '20260112',
-        sequence: '1',
-        images: ['', '', ''],
-        brand: '',
-        notes: '',
-        shipment: '空白'
-    },
-    {
-        id: 11,
-        date: '20260122',
-        sequence: '1',
-        images: ['', '', ''],
-        brand: '',
-        notes: '',
-        shipment: '空白'
-    },
-    {
-        id: 12,
-        date: '20260129',
-        sequence: '1',
-        images: ['', '', ''],
-        brand: '',
-        notes: '',
-        shipment: '空白'
-    },
-    {
-        id: 13,
-        date: '20260202',
-        sequence: '1',
-        images: ['', '', ''],
-        brand: '',
-        notes: '',
-        shipment: '空白'
-    }
-];
+// 購物資料清單
+let shoppingList = [];
 
 // 多語言配置
 const translations = {
@@ -726,8 +589,11 @@ async function updateShipment(id, value) {
     const item = shoppingList.find(i => i.id === id);
     if (item) {
         item.shipment = value;
-        await updateItemToSheet(item);
-        showNotification(t('shipmentSuccess'));
+        const success = await updateItemToSheet(item);
+        if (success) {
+            await loadDataFromSheet(); // 強制刷新
+            showNotification(t('shipmentSuccess'));
+        }
     }
 }
 
