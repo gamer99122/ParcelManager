@@ -30,10 +30,15 @@ function doGet(e) {
     const action = e.parameter.action;
 
     if (action === 'read') {
-        return readData();
+        const result = readData();
+        return HtmlService.createHtmlOutput(result.getContent())
+            .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
 
-    return createResponse(false, '不明なアクション');
+    return HtmlService.createHtmlOutput(JSON.stringify({
+        success: false,
+        message: '不明なアクション'
+    }));
 }
 
 // ===== データを読み込む =====

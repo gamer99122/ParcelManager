@@ -6,12 +6,11 @@ async function loadDataFromSheet() {
     try {
         console.log('正在從 Google Sheet 讀取資料...');
 
-        const response = await fetch(APPS_SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'read' })
-        });
-
-        const result = await response.json();
+        // 使用 GET 請求避免 CORS 問題
+        const url = APPS_SCRIPT_URL + '?action=read';
+        const response = await fetch(url);
+        const jsonText = await response.text();
+        const result = JSON.parse(jsonText);
 
         if (result.success) {
             shoppingList = result.data || [];
