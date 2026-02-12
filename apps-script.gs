@@ -38,8 +38,8 @@ function readData() {
     sequence: row[1],
     images: [row[2], row[3], row[4]],
     brand: row[5],
-    shipment: row[6], // 修正：第 7 欄對應寄送狀態
-    notes: row[7]     // 修正：第 8 欄對應備註
+    notes: row[6],     // 修正：第 7 欄 (G) 應為備註
+    shipment: row[7]  // 修正：第 8 欄 (H) 應為寄送狀態
   })).filter(item => item.date || item.sequence);
   return { success: true, message: '讀取成功', data: jsonData };
 }
@@ -54,8 +54,8 @@ function updateItem(item) {
     item.date, item.sequence, 
     item.images[0] || '', item.images[1] || '', item.images[2] || '',
     item.brand, 
-    item.shipment, // 修正：寫入第 7 欄
-    item.notes     // 修正：寫入第 8 欄
+    item.notes,    // 修正：寫入第 7 欄 (G) 為備註
+    item.shipment  // 修正：寫入第 8 欄 (H) 為寄送狀態
   ]];
   sheet.getRange(rowNum, 1, 1, 8).setValues(values);
   return { success: true, message: '更新成功' };
@@ -67,8 +67,8 @@ function addItem(item) {
     item.date, item.sequence, 
     item.images[0] || '', item.images[1] || '', item.images[2] || '',
     item.brand, 
-    item.shipment || '空白', // 修正：寫入第 7 欄
-    item.notes              // 修正：寫入第 8 欄
+    item.notes,             // 修正：寫入第 7 欄 (G) 為備註
+    item.shipment || '空白'  // 修正：寫入第 8 欄 (H) 為寄送狀態
   ];
   sheet.appendRow(values);
   return { success: true, message: '新增成功' };
