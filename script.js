@@ -1,50 +1,37 @@
-// ===== Google Sheets 整合設定 =====
-const SHEET_ID = '1Vv1NVFUnHMyu2998_kzMjiRAVaqW9WRgW7-EUAruRlE';
-const SHEET_NAME = 'Sheet1';
+// ===== Sheet2API 設定 =====
+const SHEET2API_URL = 'https://sheet2api.com/v1/0xbsaNcnQDyd/%25E5%258C%2585%25E8%25A3%25B9%25E6%25B8%2585%25E5%2596%25AE';
 
-// ===== 從 Google Sheet 讀取資料 =====
+// ===== 從 Sheet2API 讀取資料 =====
 async function loadDataFromSheet() {
     try {
         console.log('正在從 Google Sheet 讀取資料...');
 
-        // 使用 Google Sheets CSV 匯出 URL（避免 CORS）
-        const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
-        const response = await fetch(csvUrl);
-        const csvText = await response.text();
+        const response = await fetch(SHEET2API_URL);
+        const data = await response.json();
 
-        // 解析 CSV
-        const lines = csvText.split('\n');
-        if (lines.length <= 1) {
-            shoppingList = [];
-            renderPage();
-            showNotification('✅ 資料已從 Google Sheet 讀取（無資料）');
-            return;
-        }
-
-        // 跳過標題行，解析資料
         shoppingList = [];
-        for (let i = 1; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (!line) continue;
 
-            const cells = parseCSV(line);
-            if (cells.length < 8 || (!cells[0] && !cells[1])) continue;
+        // Sheet2API 返回的格式
+        if (data && Array.isArray(data)) {
+            data.forEach((row, index) => {
+                if (!row['收件日期'] && !row['序號']) return;
 
-            const item = {
-                id: i,
-                date: cells[0] || '',
-                sequence: cells[1] || '',
-                images: [
-                    cells[2] || '',
-                    cells[3] || '',
-                    cells[4] || ''
-                ],
-                brand: cells[5] || '',
-                notes: cells[6] || '',
-                shipment: cells[7] || '空白'
-            };
+                const item = {
+                    id: index + 1,
+                    date: String(row['收件日期'] || ''),
+                    sequence: String(row['序號'] || ''),
+                    images: [
+                        String(row['圖片1'] || ''),
+                        String(row['圖片2'] || ''),
+                        String(row['圖片3'] || '')
+                    ],
+                    brand: String(row['商家'] || ''),
+                    notes: String(row['備註'] || ''),
+                    shipment: String(row['寄送狀態'] || '空白')
+                };
 
-            shoppingList.push(item);
+                shoppingList.push(item);
+            });
         }
 
         console.log(`成功讀取 ${shoppingList.length} 個項目`);
@@ -56,49 +43,73 @@ async function loadDataFromSheet() {
     }
 }
 
-// ===== 解析 CSV 行 =====
-function parseCSV(line) {
-    const result = [];
-    let current = '';
-    let inQuotes = false;
-
-    for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-
-        if (char === '"') {
-            inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-            result.push(current.trim());
-            current = '';
-        } else {
-            current += char;
-        }
-    }
-
-    result.push(current.trim());
-    return result;
-}
-
-// ===== 更新項目到本地（提示手動編輯 Google Sheet） =====
+// ===== 更新項目到 Google Sheet =====
 async function updateItemToSheet(item) {
     try {
-        console.log('項目已在本地更新');
-        showNotification('⚠️ 已更新本地，請手動編輯 Google Sheet 以保存');
-        return true;
+        console.log('正在更新項目到 Google Sheet...');
+
+        // 準備更新資料
+        const updateData = {
+            '收件日期': item.date,
+            '序號': item.sequence,
+            '圖片1': item.images[0],
+            '圖片2': item.images[1],
+            '圖片3': item.images[2],
+            '商家': item.brand,
+            '備註': item.notes,
+            '寄送狀態': item.shipment
+        };
+
+        // 使用 PUT 更新（基於 ID）
+        const url = `${SHEET2API_URL}/${item.id}`;
+        const response = await fetch(url, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updateData)
+        });
+
+        if (response.ok) {
+            console.log('項目已更新');
+            showNotification('✅ 項目已保存到 Google Sheet');
+            return true;
+        } else {
+            console.error('更新失敗');
+            showNotification('❌ 更新失敗，請重試');
+            return false;
+        }
     } catch (error) {
         console.error('更新錯誤:', error);
+        showNotification('❌ 更新錯誤: ' + error.message);
         return false;
     }
 }
 
-// ===== 刪除項目（本地刪除） =====
+// ===== 刪除項目 =====
 async function deleteItemFromSheet(id) {
     try {
-        console.log('項目已本地刪除');
-        showNotification('⚠️ 已刪除本地，請在 Google Sheet 中手動刪除該列');
-        return true;
+        console.log('正在刪除項目...');
+
+        // 使用 DELETE 刪除
+        const url = `${SHEET2API_URL}/${id}`;
+        const response = await fetch(url, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            console.log('項目已刪除');
+            await loadDataFromSheet();
+            showNotification('✅ 項目已從 Google Sheet 刪除');
+            return true;
+        } else {
+            console.error('刪除失敗');
+            showNotification('❌ 刪除失敗，請重試');
+            return false;
+        }
     } catch (error) {
         console.error('刪除錯誤:', error);
+        showNotification('❌ 刪除錯誤: ' + error.message);
         return false;
     }
 }
