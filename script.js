@@ -3,45 +3,80 @@ const SHEET2API_URL = 'https://sheet2api.com/v1/0xbsaNcnQDyd/%25E5%258C%2585%25E
 const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz_DRbehgkkpLHZw0kFIVNafkbSJQTynYfkWATSKlYyHnFKPfGjwf57VLvkbR9ltp1o/exec';
 const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 
-// ===== 從 Sheet2API 讀取資料 =====
+// ===== 從 Google Sheet 讀取資料 =====
 async function loadDataFromSheet() {
     try {
         console.log('正在從 Google Sheet 讀取資料...');
+        
+        // 使用 Apps Script 的 read action
+        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?action=read`);
+        const result = await response.json();
 
-        const response = await fetch(SHEET2API_URL);
-        const data = await response.json();
-
-        shoppingList = [];
-
-        // Sheet2API 返回的格式
-        if (data && Array.isArray(data)) {
-            data.forEach((row, index) => {
-                if (!row['收件日期'] && !row['序號']) return;
-
-                const item = {
+        if (result.success && result.data) {
+            shoppingList = result.data.map(item => ({
+                id: item.id,
+                date: String(item.date || ''),
+                sequence: String(item.sequence || ''),
+                images: item.images || ['', '', ''],
+                brand: String(item.brand || ''),
+                notes: String(item.notes || ''),
+                shipment: String(item.shipment || '空白')
+            }));
+            
+            console.log(`成功讀取 ${shoppingList.length} 個項目`);
+            renderPage();
+            showNotification('✅ 資料已從 Google Sheet 讀取');
+        } else {
+            // 如果 Apps Script 讀取失敗，嘗試備用方案 (原本的 Sheet2API)
+            console.warn('Apps Script 讀取失敗，嘗試 Sheet2API...');
+            const backupResponse = await fetch(SHEET2API_URL);
+            const data = await backupResponse.json();
+            
+            if (data && Array.isArray(data)) {
+                shoppingList = data.map((row, index) => ({
                     id: index + 1,
-                    date: String(row['收件日期'] || ''),
+                    date: String(row['收件日期'] || row['日期'] || ''),
                     sequence: String(row['序號'] || ''),
-                    images: [
-                        String(row['圖片1'] || ''),
-                        String(row['圖片2'] || ''),
-                        String(row['圖片3'] || '')
-                    ],
-                    brand: String(row['商家'] || ''),
+                    images: [String(row['圖片1'] || ''), String(row['圖片2'] || ''), String(row['圖片3'] || '')],
+                    brand: String(row['商家'] || row['品牌'] || ''),
                     notes: String(row['備註'] || ''),
                     shipment: String(row['寄送狀態'] || '空白')
-                };
-
-                shoppingList.push(item);
-            });
+                }));
+                renderPage();
+            }
         }
-
-        console.log(`成功讀取 ${shoppingList.length} 個項目`);
-        renderPage();
-        showNotification('✅ 資料已從 Google Sheet 讀取');
     } catch (error) {
         console.error('讀取錯誤:', error);
         showNotification('❌ 連接錯誤: ' + error.message);
+    }
+}
+
+// ===== 保存新項目到 Google Sheet =====
+async function addItemToSheet(item) {
+    try {
+        console.log('正在保存新項目到 Google Sheet...');
+        
+        const params = new URLSearchParams({
+            action: 'write',
+            item: JSON.stringify(item)
+        });
+
+        const response = await fetch(`${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`);
+        const result = await response.json();
+
+        if (result.success) {
+            console.log('✅ 項目已新增成功');
+            await loadDataFromSheet();
+            return true;
+        } else {
+            console.error('❌ 新增失敗:', result.message);
+            showNotification('❌ 保存失敗: ' + result.message);
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ 保存錯誤:', error);
+        showNotification('❌ 保存錯誤: ' + error.message);
+        return false;
     }
 }
 
@@ -49,13 +84,12 @@ async function loadDataFromSheet() {
 async function updateItemToSheet(item) {
     try {
         console.log('正在更新項目到 Google Sheet...');
-        console.log('使用 Google Apps Script + CORS 代理');
-        console.log('項目 ID:', item.id);
-
-        // 準備更新資料
-        const updatePayload = {
+        
+        // 使用 GET 請求來避免 CORS 預檢 (Preflight) 問題
+        // 將資料轉化為 URL 參數
+        const params = new URLSearchParams({
             action: 'update',
-            item: {
+            item: JSON.stringify({
                 id: item.id,
                 date: item.date,
                 sequence: item.sequence,
@@ -63,51 +97,57 @@ async function updateItemToSheet(item) {
                 brand: item.brand,
                 notes: item.notes,
                 shipment: item.shipment
-            }
-        };
-
-        console.log('更新資料:', updatePayload);
-
-        // 使用 CORS 代理
-        const proxyUrl = CORS_PROXY + encodeURIComponent(GOOGLE_APPS_SCRIPT_URL);
-        console.log('代理 URL:', proxyUrl);
-
-        const response = await fetch(proxyUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(updatePayload)
+            })
         });
 
-        const responseText = await response.text();
-        console.log('響應狀態:', response.status);
-        console.log('響應內容:', responseText);
+        const url = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
+        console.log('請求 URL:', url);
 
-        if (response.ok) {
-            try {
-                const result = JSON.parse(responseText);
-                if (result.success) {
-                    console.log('✅ 項目已更新成功');
-                    showNotification('✅ 項目已保存到 Google Sheet');
-                    return true;
-                } else {
-                    console.error('❌ 更新失敗:', result.message);
-                    showNotification('❌ 更新失敗: ' + result.message);
-                    return false;
-                }
-            } catch (e) {
-                console.error('❌ 解析回應失敗:', e);
-                showNotification('❌ 更新失敗，請重試');
-                return false;
-            }
+        // 直接請求 Google Apps Script，不使用代理 (GET 請求通常可以正常運作)
+        const response = await fetch(url, {
+            method: 'GET',
+            mode: 'cors'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP 錯誤! 狀態碼: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log('響應結果:', result);
+
+        if (result.success) {
+            console.log('✅ 項目已更新成功');
+            showNotification('✅ 項目已保存到 Google Sheet');
+            return true;
         } else {
-            console.error('❌ 更新失敗，狀態碼:', response.status);
-            showNotification(`❌ 更新失敗 (${response.status})`);
+            console.error('❌ 更新失敗:', result.message);
+            showNotification('❌ 更新失敗: ' + result.message);
             return false;
         }
     } catch (error) {
         console.error('❌ 更新錯誤:', error);
+        
+        // 如果直接請求失敗，嘗試使用代理
+        try {
+            console.log('直接請求失敗，嘗試使用代理...');
+            const params = new URLSearchParams({
+                action: 'update',
+                item: JSON.stringify(item)
+            });
+            const proxyUrl = CORS_PROXY + encodeURIComponent(`${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`);
+            const response = await fetch(proxyUrl);
+            const data = await response.json();
+            
+            // AllOrigins 的 /raw 模式會直接回傳內容
+            if (data.success) {
+                showNotification('✅ 項目已保存到 Google Sheet (經代理)');
+                return true;
+            }
+        } catch (proxyError) {
+            console.error('代理請求也失敗:', proxyError);
+        }
+        
         showNotification('❌ 更新錯誤: ' + error.message);
         return false;
     }
@@ -117,53 +157,33 @@ async function updateItemToSheet(item) {
 async function deleteItemFromSheet(id) {
     try {
         console.log('正在刪除項目...');
-        console.log('刪除項目 ID:', id);
-
-        // 準備刪除請求
-        const deletePayload = {
+        
+        const params = new URLSearchParams({
             action: 'delete',
             id: id
-        };
-
-        console.log('刪除請求:', deletePayload);
-
-        // 使用 CORS 代理
-        const proxyUrl = CORS_PROXY + encodeURIComponent(GOOGLE_APPS_SCRIPT_URL);
-        console.log('代理 URL:', proxyUrl);
-
-        const response = await fetch(proxyUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(deletePayload)
         });
 
-        const responseText = await response.text();
-        console.log('響應狀態:', response.status);
-        console.log('響應內容:', responseText);
+        const url = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            mode: 'cors'
+        });
 
-        if (response.ok) {
-            try {
-                const result = JSON.parse(responseText);
-                if (result.success) {
-                    console.log('✅ 項目已刪除成功');
-                    await loadDataFromSheet();
-                    showNotification('✅ 項目已從 Google Sheet 刪除');
-                    return true;
-                } else {
-                    console.error('❌ 刪除失敗:', result.message);
-                    showNotification('❌ 刪除失敗: ' + result.message);
-                    return false;
-                }
-            } catch (e) {
-                console.error('❌ 解析回應失敗:', e);
-                showNotification('❌ 刪除失敗，請重試');
-                return false;
-            }
+        if (!response.ok) {
+            throw new Error(`HTTP 錯誤! 狀態碼: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+            console.log('✅ 項目已刪除成功');
+            await loadDataFromSheet();
+            showNotification('✅ 項目已從 Google Sheet 刪除');
+            return true;
         } else {
-            console.error('❌ 刪除失敗，狀態碼:', response.status);
-            showNotification(`❌ 刪除失敗 (${response.status})`);
+            console.error('❌ 刪除失敗:', result.message);
+            showNotification('❌ 刪除失敗: ' + result.message);
             return false;
         }
     } catch (error) {
@@ -600,9 +620,19 @@ function renderTable() {
     itemCount.textContent = shoppingList.length;
 }
 
-// 切換新增表單 (後續實現)
+// 切換新增表單
 function toggleAddForm() {
-    alert('新增功能將在下一個版本實現');
+    currentEditId = null;
+    document.getElementById('editForm').reset();
+    
+    // 設定預設日期為今天
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('editDate').value = today;
+    document.getElementById('editSequence').value = "1";
+    document.getElementById('editShipment').value = "空白";
+
+    const modal = new bootstrap.Modal(document.getElementById('editModal'));
+    modal.show();
 }
 
 // 編輯項目
@@ -622,7 +652,7 @@ function editItem(id) {
     document.getElementById('editNotes').value = item.notes || '';
     document.getElementById('editShipment').value = item.shipment || '空白';
 
-    // 顯示模態框 (使用 Bootstrap Modal API)
+    // 顯示模態框
     const modal = new bootstrap.Modal(document.getElementById('editModal'));
     modal.show();
 }
@@ -638,34 +668,37 @@ function closeEditModal() {
     document.getElementById('editForm').reset();
 }
 
-// 儲存編輯
+// 儲存編輯或新增
 async function saveEdit(event) {
     event.preventDefault();
 
-    if (currentEditId === null) return;
+    const itemData = {
+        date: parseDate(document.getElementById('editDate').value),
+        sequence: document.getElementById('editSequence').value,
+        images: [
+            document.getElementById('editImage1').value,
+            document.getElementById('editImage2').value,
+            document.getElementById('editImage3').value
+        ],
+        brand: document.getElementById('editBrand').value,
+        notes: document.getElementById('editNotes').value,
+        shipment: document.getElementById('editShipment').value
+    };
 
-    const item = shoppingList.find(i => i.id === currentEditId);
-    if (!item) return;
-
-    // 更新資料
-    item.date = parseDate(document.getElementById('editDate').value);
-    item.sequence = document.getElementById('editSequence').value;
-    item.images = [
-        document.getElementById('editImage1').value,
-        document.getElementById('editImage2').value,
-        document.getElementById('editImage3').value
-    ];
-    item.brand = document.getElementById('editBrand').value;
-    item.notes = document.getElementById('editNotes').value;
-    item.shipment = document.getElementById('editShipment').value;
-
-    // 保存到 Google Sheet
-    const success = await updateItemToSheet(item);
+    let success = false;
+    if (currentEditId !== null) {
+        // 更新現有項目
+        itemData.id = currentEditId;
+        success = await updateItemToSheet(itemData);
+    } else {
+        // 新增項目
+        success = await addItemToSheet(itemData);
+    }
 
     if (success) {
-        renderTable();
+        await loadDataFromSheet(); // 重新讀取以確保資料一致性
         closeEditModal();
-        showNotification(t('editSuccess'));
+        showNotification(currentEditId !== null ? t('editSuccess') : '✅ 項目已新增成功');
     }
 }
 
