@@ -104,6 +104,10 @@
                             <input type="text" class="form-control" id="editBrand" placeholder="輸入商家名稱">
                         </div>
                         <div class="mb-3">
+                            <label for="editNotes" class="form-label fw-bold">備註</label>
+                            <textarea class="form-control" id="editNotes" rows="3" placeholder="輸入備註說明"></textarea>
+                        </div>
+                        <div class="mb-3">
                             <label for="editShipment" class="form-label fw-bold">寄送狀態</label>
                             <select class="form-select" id="editShipment" required>
                                 <option value="空白">空白</option>
@@ -111,10 +115,6 @@
                                 <option value="寄送">寄送</option>
                                 <option value="部分寄送">部分寄送</option>
                             </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="editNotes" class="form-label fw-bold">備註</label>
-                            <textarea class="form-control" id="editNotes" rows="3" placeholder="輸入備註說明"></textarea>
                         </div>
                         <div class="d-flex gap-2 justify-content-end">
                             <button type="button" class="btn btn-secondary" onclick="closeEditModal()">取消</button>
