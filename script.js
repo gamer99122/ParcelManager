@@ -109,17 +109,39 @@ let shoppingList = [];
 let currentEditId = null;
 let shipmentTimeout = null;
 
-async function loadDataFromSheet() {
+async function loadDataFromSheet(retryCount = 0) {
     try {
         window.showLoading(true);
+        console.log('📖 正在讀取資料... (嘗試 ' + (retryCount + 1) + ')');
+
         const result = await callAppsScript({ action: 'read' });
-        if (result.success) {
+
+        console.log('📊 讀取結果:', result);
+
+        if (result && result.success) {
             shoppingList = result.data || [];
+            console.log('✅ 讀取成功，項目數:', shoppingList.length);
             renderTable();
             window.showNotification('✅ 資料已同步');
+        } else {
+            console.error('❌ API 返回失敗:', result);
+            window.showNotification('❌ 讀取失敗: ' + (result?.message || '未知錯誤'));
+
+            // 自動重試一次
+            if (retryCount < 1) {
+                console.log('⏳ 3 秒後自動重試...');
+                setTimeout(() => loadDataFromSheet(retryCount + 1), 3000);
+            }
         }
     } catch (e) {
-        window.showNotification('❌ 讀取失敗');
+        console.error('❌ 讀取異常:', e);
+        window.showNotification('❌ 讀取失敗: ' + e.message);
+
+        // 自動重試一次
+        if (retryCount < 1) {
+            console.log('⏳ 3 秒後自動重試...');
+            setTimeout(() => loadDataFromSheet(retryCount + 1), 3000);
+        }
     } finally {
         window.showLoading(false);
     }
