@@ -135,10 +135,12 @@ function renderTable() {
         const validImages = (item.images || []).filter(img => img && img.trim());
         const imageHTML = validImages.length > 0 ?
             `<div class="image-gallery" onclick="openLightbox(${item.id})">
-                <div class="image-placeholder" style="position: relative;">
-                    <img src="${validImages[0]}" onerror="this.parentElement.innerHTML='❌'">
-                    <span class="image-count">1/${validImages.length}</span>
-                </div>
+                ${validImages.map((img, idx) =>
+                    `<div class="image-placeholder" style="position: relative;">
+                        <img src="${img}" alt="圖片 ${idx + 1}" onerror="this.parentElement.innerHTML='❌'">
+                        <span class="image-count">${idx + 1}/${validImages.length}</span>
+                    </div>`
+                ).join('')}
             </div>` : `<div class="image-placeholder">無圖片</div>`;
 
         return `
