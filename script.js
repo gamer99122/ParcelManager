@@ -515,9 +515,27 @@ function closeEditModal() {
     document.getElementById('editForm').reset();
 }
 
+// 顯示載入中
+function showLoading(show) {
+    const overlay = document.getElementById('loadingOverlay');
+    if (show) {
+        overlay.classList.remove('d-none');
+    } else {
+        overlay.classList.add('d-none');
+    }
+}
+
 // 儲存編輯或新增
 async function saveEdit(event) {
     event.preventDefault();
+
+    const saveBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = saveBtn.innerHTML;
+    
+    // 進入載入狀態
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 儲存中...';
+    showLoading(true);
 
     const itemData = {
         date: parseDate(document.getElementById('editDate').value),
@@ -533,53 +551,38 @@ async function saveEdit(event) {
     };
 
     let success = false;
-    if (currentEditId !== null) {
-        // 更新現有項目
-        itemData.id = currentEditId;
-        success = await updateItemToSheet(itemData);
-    } else {
-        // 新增項目
-        success = await addItemToSheet(itemData);
+    try {
+        if (currentEditId !== null) {
+            itemData.id = currentEditId;
+            success = await updateItemToSheet(itemData);
+        } else {
+            success = await addItemToSheet(itemData);
+        }
+
+        if (success) {
+            await loadDataFromSheet();
+            closeEditModal();
+            showNotification(currentEditId !== null ? t('editSuccess') : '✅ 項目已新增成功');
+        }
+    } finally {
+        // 結束載入狀態
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalText;
+        showLoading(false);
     }
-
-    if (success) {
-        await loadDataFromSheet(); // 重新讀取以確保資料一致性
-        closeEditModal();
-        showNotification(currentEditId !== null ? t('editSuccess') : '✅ 項目已新增成功');
-    }
-}
-
-// 顯示通知
-function showNotification(message) {
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #10b981;
-        color: white;
-        padding: 15px 25px;
-        border-radius: 5px;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-        z-index: 2000;
-        animation: slideInRight 0.3s ease;
-    `;
-    notification.textContent = message;
-    document.body.appendChild(notification);
-
-    // 3 秒後移除
-    setTimeout(() => {
-        notification.style.animation = 'slideOutRight 0.3s ease';
-        setTimeout(() => notification.remove(), 300);
-    }, 3000);
 }
 
 // 刪除項目
 async function deleteItem(id) {
     if (confirm(t('deleteConfirm'))) {
-        const success = await deleteItemFromSheet(id);
-        if (success) {
-            showNotification(t('deleteSuccess'));
+        showLoading(true);
+        try {
+            const success = await deleteItemFromSheet(id);
+            if (success) {
+                showNotification(t('deleteSuccess'));
+            }
+        } finally {
+            showLoading(false);
         }
     }
 }
@@ -589,10 +592,26 @@ async function updateShipment(id, value) {
     const item = shoppingList.find(i => i.id === id);
     if (item) {
         item.shipment = value;
-        const success = await updateItemToSheet(item);
-        if (success) {
-            await loadDataFromSheet(); // 強制刷新
-            showNotification(t('shipmentSuccess'));
+        
+        // 尋找當前的 select 並暫時禁用
+        const selects = document.querySelectorAll('.shipment-select');
+        let targetSelect = null;
+        selects.forEach(s => {
+            if (s.getAttribute('onchange').includes(id)) targetSelect = s;
+        });
+        
+        if (targetSelect) targetSelect.disabled = true;
+        showLoading(true);
+
+        try {
+            const success = await updateItemToSheet(item);
+            if (success) {
+                await loadDataFromSheet();
+                showNotification(t('shipmentSuccess'));
+            }
+        } finally {
+            if (targetSelect) targetSelect.disabled = false;
+            showLoading(false);
         }
     }
 }
