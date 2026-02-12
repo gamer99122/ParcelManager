@@ -43,30 +43,51 @@ function formatDate(dateString) {
 }
 function parseDate(dateString) { return dateString.replace(/-/g, ''); }
 
-// 3. JSONP 請求核心
+// 3. JSONP 請求核心（添加防重複邏輯）
+let pendingRequests = {};
+
 function callAppsScript(params) {
     return new Promise((resolve, reject) => {
+        // 防止重複請求
+        const requestKey = params.action + (params.item ? params.item : '');
+        if (pendingRequests[requestKey]) {
+            console.log('⚠️ 重複請求被攔截');
+            return resolve(pendingRequests[requestKey]);
+        }
+
         const callbackName = 'jsonp_' + Math.round(100000 * Math.random());
         window[callbackName] = function(data) {
             delete window[callbackName];
+            delete pendingRequests[requestKey];
             const scriptTag = document.getElementById(callbackName);
             if (scriptTag) document.body.removeChild(scriptTag);
             resolve(data);
         };
+
         params.callback = callbackName;
         params._t = new Date().getTime();
         const queryString = new URLSearchParams(params).toString();
         const url = `${GOOGLE_APPS_SCRIPT_URL}?${queryString}`;
-        
+
         const script = document.createElement('script');
         script.id = callbackName;
         script.src = url;
         script.onerror = () => {
             delete window[callbackName];
+            delete pendingRequests[requestKey];
             reject(new Error('連線失敗'));
         };
+
+        pendingRequests[requestKey] = true;
         document.body.appendChild(script);
-        setTimeout(() => { if (window[callbackName]) reject(new Error('逾時')); }, 20000);
+
+        setTimeout(() => {
+            if (window[callbackName]) {
+                delete window[callbackName];
+                delete pendingRequests[requestKey];
+                reject(new Error('逾時'));
+            }
+        }, 20000);
     });
 }
 
