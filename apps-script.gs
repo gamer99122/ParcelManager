@@ -35,16 +35,20 @@ function readData() {
   let sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
 
   const data = sheet.getDataRange().getValues();
-  const rows = data.slice(1);
-  const jsonData = rows.map((row, index) => ({
-    id: index + 1,
-    date: row[0],
-    sequence: row[1],
-    images: [row[2], row[3], row[4]],
-    brand: row[5],
-    shipment: row[6], // 正確：第 7 欄 (G) 為寄送狀態
-    notes: row[7]     // 正確：第 8 欄 (H) 為備註
-  })).filter(item => item.date || item.sequence);
+  const rows = data.slice(1); // 跳過標題行
+
+  const jsonData = rows
+    .map((row, index) => ({
+      id: index + 1,
+      date: String(row[0] || '').trim(),
+      sequence: String(row[1] || '').trim(),
+      images: [String(row[2] || '').trim(), String(row[3] || '').trim(), String(row[4] || '').trim()],
+      brand: String(row[5] || '').trim(),
+      shipment: String(row[6] || '空白').trim(),
+      notes: String(row[7] || '').trim()
+    }))
+    .filter(item => item.date && item.sequence); // 更嚴格的過濾條件
+
   return { success: true, message: '讀取成功', data: jsonData };
 }
 
