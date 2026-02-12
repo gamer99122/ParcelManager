@@ -48,10 +48,12 @@ let pendingRequests = {};
 
 function callAppsScript(params) {
     return new Promise((resolve, reject) => {
-        // 防止重複請求 - 使用 Promise 來等待第一次請求的結果
+        // 防止重複請求 - 只對 write/update/delete 操作進行防重複
+        // read 操作允許多個並發（因為是唯讀的）
+        const shouldDeduplicte = params.action !== 'read';
         const requestKey = params.action + (params.item ? JSON.stringify(params.item) : params.action);
 
-        if (pendingRequests[requestKey]) {
+        if (shouldDeduplicte && pendingRequests[requestKey]) {
             console.log('⚠️ 重複請求被攔截，等待第一次請求的結果');
             // 等待第一次請求完成，返回相同的結果
             return pendingRequests[requestKey].then(resolve).catch(reject);
@@ -85,12 +87,14 @@ function callAppsScript(params) {
             setTimeout(() => {
                 if (window[callbackName]) {
                     delete window[callbackName];
-                    rejectRequest(new Error('逾時'));
+                    rejectRequest(new Error('逾時（Google Apps Script 可能繁忙）'));
                 }
-            }, 20000);
+            }, 30000); // 延長到 30 秒以應對慢速網路
         });
 
-        pendingRequests[requestKey] = requestPromise;
+        if (shouldDeduplicte) {
+            pendingRequests[requestKey] = requestPromise;
+        }
 
         requestPromise
             .then(result => {
