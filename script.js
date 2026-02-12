@@ -1,5 +1,6 @@
-// ===== Sheet2API 設定 =====
+// ===== API 設定 =====
 const SHEET2API_URL = 'https://sheet2api.com/v1/0xbsaNcnQDyd/%25E5%258C%2585%25E8%25A3%25B9%25E6%25B8%2585%25E5%2596%25AE';
+const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz_DRbehgkkpLHZw0kFIVNafkbSJQTynYfkWATSKlYyHnFKPfGjwf57VLvkbR9ltp1o/exec';
 
 // ===== 從 Sheet2API 讀取資料 =====
 async function loadDataFromSheet() {
@@ -47,46 +48,57 @@ async function loadDataFromSheet() {
 async function updateItemToSheet(item) {
     try {
         console.log('正在更新項目到 Google Sheet...');
-        console.log('更新項目 ID:', item.id);
-        console.log('API URL:', SHEET2API_URL);
+        console.log('使用 Google Apps Script 更新');
+        console.log('項目 ID:', item.id);
 
         // 準備更新資料
-        const updateData = {
-            '收件日期': item.date,
-            '序號': item.sequence,
-            '圖片1': item.images[0],
-            '圖片2': item.images[1],
-            '圖片3': item.images[2],
-            '商家': item.brand,
-            '備註': item.notes,
-            '寄送狀態': item.shipment
+        const updatePayload = {
+            action: 'update',
+            item: {
+                id: item.id,
+                date: item.date,
+                sequence: item.sequence,
+                images: item.images,
+                brand: item.brand,
+                notes: item.notes,
+                shipment: item.shipment
+            }
         };
 
-        console.log('更新資料:', updateData);
+        console.log('更新資料:', updatePayload);
 
-        // 使用 PUT 更新（基於 ID）
-        const url = `${SHEET2API_URL}/${item.id}`;
-        console.log('完整請求 URL:', url);
-
-        const response = await fetch(url, {
-            method: 'PUT',
+        const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(updateData)
+            body: JSON.stringify(updatePayload)
         });
 
-        console.log('響應狀態:', response.status, response.statusText);
         const responseText = await response.text();
+        console.log('響應狀態:', response.status);
         console.log('響應內容:', responseText);
 
         if (response.ok) {
-            console.log('✅ 項目已更新成功');
-            showNotification('✅ 項目已保存到 Google Sheet');
-            return true;
+            try {
+                const result = JSON.parse(responseText);
+                if (result.success) {
+                    console.log('✅ 項目已更新成功');
+                    showNotification('✅ 項目已保存到 Google Sheet');
+                    return true;
+                } else {
+                    console.error('❌ 更新失敗:', result.message);
+                    showNotification('❌ 更新失敗: ' + result.message);
+                    return false;
+                }
+            } catch (e) {
+                console.error('❌ 解析回應失敗:', e);
+                showNotification('❌ 更新失敗，請重試');
+                return false;
+            }
         } else {
             console.error('❌ 更新失敗，狀態碼:', response.status);
-            showNotification(`❌ 更新失敗 (${response.status}): ${responseText}`);
+            showNotification(`❌ 更新失敗 (${response.status})`);
             return false;
         }
     } catch (error) {
@@ -100,25 +112,53 @@ async function updateItemToSheet(item) {
 async function deleteItemFromSheet(id) {
     try {
         console.log('正在刪除項目...');
+        console.log('刪除項目 ID:', id);
 
-        // 使用 DELETE 刪除
-        const url = `${SHEET2API_URL}/${id}`;
-        const response = await fetch(url, {
-            method: 'DELETE'
+        // 準備刪除請求
+        const deletePayload = {
+            action: 'delete',
+            id: id
+        };
+
+        console.log('刪除請求:', deletePayload);
+
+        const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(deletePayload)
         });
 
+        const responseText = await response.text();
+        console.log('響應狀態:', response.status);
+        console.log('響應內容:', responseText);
+
         if (response.ok) {
-            console.log('項目已刪除');
-            await loadDataFromSheet();
-            showNotification('✅ 項目已從 Google Sheet 刪除');
-            return true;
+            try {
+                const result = JSON.parse(responseText);
+                if (result.success) {
+                    console.log('✅ 項目已刪除成功');
+                    await loadDataFromSheet();
+                    showNotification('✅ 項目已從 Google Sheet 刪除');
+                    return true;
+                } else {
+                    console.error('❌ 刪除失敗:', result.message);
+                    showNotification('❌ 刪除失敗: ' + result.message);
+                    return false;
+                }
+            } catch (e) {
+                console.error('❌ 解析回應失敗:', e);
+                showNotification('❌ 刪除失敗，請重試');
+                return false;
+            }
         } else {
-            console.error('刪除失敗');
-            showNotification('❌ 刪除失敗，請重試');
+            console.error('❌ 刪除失敗，狀態碼:', response.status);
+            showNotification(`❌ 刪除失敗 (${response.status})`);
             return false;
         }
     } catch (error) {
-        console.error('刪除錯誤:', error);
+        console.error('❌ 刪除錯誤:', error);
         showNotification('❌ 刪除錯誤: ' + error.message);
         return false;
     }
