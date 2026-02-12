@@ -21,6 +21,13 @@ function doPost(e) {
     }
 }
 
+// ===== GET リクエストも処理 =====
+function doGet(e) {
+    return HtmlService.createHtmlOutput('<h1>ParcelManager API</h1><p>POST requests only</p>')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
 // ===== アイテムを更新 =====
 function updateItem(item) {
     try {
@@ -75,8 +82,8 @@ function createResponse(success, message, data = null) {
         response.data = data;
     }
 
-    const output = ContentService.createTextOutput(JSON.stringify(response))
-        .setMimeType(ContentService.MimeType.JSON);
-
-    return output;
+    // 使用 HtmlService 來返回 JSON，有時可以繞過 CORS
+    return HtmlService.createHtmlOutput(JSON.stringify(response))
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
