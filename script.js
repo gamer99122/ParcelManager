@@ -47,6 +47,8 @@ async function loadDataFromSheet() {
 async function updateItemToSheet(item) {
     try {
         console.log('正在更新項目到 Google Sheet...');
+        console.log('更新項目 ID:', item.id);
+        console.log('API URL:', SHEET2API_URL);
 
         // 準備更新資料
         const updateData = {
@@ -60,8 +62,12 @@ async function updateItemToSheet(item) {
             '寄送狀態': item.shipment
         };
 
+        console.log('更新資料:', updateData);
+
         // 使用 PUT 更新（基於 ID）
         const url = `${SHEET2API_URL}/${item.id}`;
+        console.log('完整請求 URL:', url);
+
         const response = await fetch(url, {
             method: 'PUT',
             headers: {
@@ -70,17 +76,21 @@ async function updateItemToSheet(item) {
             body: JSON.stringify(updateData)
         });
 
+        console.log('響應狀態:', response.status, response.statusText);
+        const responseText = await response.text();
+        console.log('響應內容:', responseText);
+
         if (response.ok) {
-            console.log('項目已更新');
+            console.log('✅ 項目已更新成功');
             showNotification('✅ 項目已保存到 Google Sheet');
             return true;
         } else {
-            console.error('更新失敗');
-            showNotification('❌ 更新失敗，請重試');
+            console.error('❌ 更新失敗，狀態碼:', response.status);
+            showNotification(`❌ 更新失敗 (${response.status}): ${responseText}`);
             return false;
         }
     } catch (error) {
-        console.error('更新錯誤:', error);
+        console.error('❌ 更新錯誤:', error);
         showNotification('❌ 更新錯誤: ' + error.message);
         return false;
     }
@@ -453,6 +463,11 @@ function formatDate(dateString) {
     // 如果已經是 YYYY-MM-DD 格式，直接返回
     if (dateString.includes('-') && dateString.length === 10) {
         return dateString;
+    }
+
+    // 如果是 YYYY/MM/DD 格式，轉換為 YYYY-MM-DD
+    if (dateString.includes('/') && dateString.length === 10) {
+        return dateString.replace(/\//g, '-');
     }
 
     // 如果是 YYYYMMDD 格式
