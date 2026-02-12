@@ -46,37 +46,43 @@ async function loadDataFromSheet() {
 // ===== 通用的 Apps Script 請求函數 (使用 JSONP) =====
 function callAppsScript(params) {
     return new Promise((resolve, reject) => {
-        // 建立一個隨機的 callback 名稱
         const callbackName = 'jsonp_' + Math.round(100000 * Math.random());
         
-        // 將 callback 函數掛載到 window
         window[callbackName] = function(data) {
             delete window[callbackName];
-            document.body.removeChild(script);
+            const scriptTag = document.getElementById(callbackName);
+            if (scriptTag) document.body.removeChild(scriptTag);
             resolve(data);
         };
 
-        // 準備參數
         params.callback = callbackName;
         const queryString = new URLSearchParams(params).toString();
-        const url = `${GOOGLE_APPS_SCRIPT_URL}?${queryString}`;
+        // 確保網址前後沒有空白
+        const baseUrl = GOOGLE_APPS_SCRIPT_URL.trim();
+        const url = `${baseUrl}?${queryString}`;
 
-        // 透過 <script> 標籤發送請求 (不受 CORS 限制)
+        console.log('--- JSONP 除錯資訊 ---');
+        console.log('請求動作:', params.action);
+        console.log('完整請求網址 (請點擊測試):', url);
+        console.log('----------------------');
+
         const script = document.createElement('script');
+        script.id = callbackName;
         script.src = url;
         script.onerror = () => {
             delete window[callbackName];
-            document.body.removeChild(script);
-            reject(new Error('連線到 Google Script 失敗 (JSONP Error)'));
+            const scriptTag = document.getElementById(callbackName);
+            if (scriptTag) document.body.removeChild(scriptTag);
+            reject(new Error(`連線到 Google Script 失敗。\n請點擊 Console 中的網址檢查是否能開啟。\n網址: ${url}`));
         };
         document.body.appendChild(script);
 
-        // 設定逾時
         setTimeout(() => {
             if (window[callbackName]) {
                 delete window[callbackName];
-                document.body.removeChild(script);
-                reject(new Error('請求逾時，請檢查網路或 Apps Script 部署狀態'));
+                const scriptTag = document.getElementById(callbackName);
+                if (scriptTag) document.body.removeChild(scriptTag);
+                reject(new Error('請求逾時 (15秒)，請確認 Apps Script 是否已發布為「任何人」均可存取。'));
             }
         }, 15000);
     });
