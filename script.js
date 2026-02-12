@@ -67,6 +67,9 @@ function callAppsScript(params) {
         };
 
         params.callback = callbackName;
+        // 加入時間戳記防止快取 (Cache Buster)
+        params._t = new Date().getTime();
+        
         const queryString = new URLSearchParams(params).toString();
         // 確保網址前後沒有空白
         const baseUrl = GOOGLE_APPS_SCRIPT_URL.trim();
