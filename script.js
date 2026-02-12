@@ -444,10 +444,36 @@ function updatePageText() {
     });
 }
 
-// 格式化日期 (YYYYMMDD -> YYYY-MM-DD)
+// 格式化日期為顯示格式 (支持多種輸入格式 -> YYYY-MM-DD)
 function formatDate(dateString) {
-    if (!dateString || dateString.length !== 8) return dateString;
-    return dateString.slice(0, 4) + '-' + dateString.slice(4, 6) + '-' + dateString.slice(6, 8);
+    if (!dateString) return '';
+
+    dateString = String(dateString).trim();
+
+    // 如果已經是 YYYY-MM-DD 格式，直接返回
+    if (dateString.includes('-') && dateString.length === 10) {
+        return dateString;
+    }
+
+    // 如果是 YYYYMMDD 格式
+    if (dateString.length === 8 && /^\d{8}$/.test(dateString)) {
+        return dateString.slice(0, 4) + '-' + dateString.slice(4, 6) + '-' + dateString.slice(6, 8);
+    }
+
+    // 嘗試解析為日期對象
+    try {
+        const date = new Date(dateString);
+        if (!isNaN(date.getTime())) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+    } catch (e) {
+        // 繼續嘗試其他格式
+    }
+
+    return dateString;
 }
 
 // 解析日期 (YYYY-MM-DD -> YYYYMMDD)
