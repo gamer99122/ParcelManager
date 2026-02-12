@@ -73,6 +73,7 @@ function callAppsScript(params) {
 // 4. 資料操作
 let shoppingList = [];
 let currentEditId = null;
+let shipmentTimeout = null;
 
 async function loadDataFromSheet() {
     try {
@@ -186,14 +187,30 @@ async function deleteItem(id) {
 async function updateShipment(id, value) {
     const item = shoppingList.find(i => i.id === id);
     if (!item) return;
+
+    // 立即更新本地顯示
     item.shipment = value;
-    window.showLoading(true);
-    try {
-        const result = await callAppsScript({ action: 'update', item: JSON.stringify(item) });
-        if (result.success) window.showNotification('✅ 狀態已更新');
-    } finally {
-        window.showLoading(false);
-    }
+
+    // 清除之前的定時器
+    if (shipmentTimeout) clearTimeout(shipmentTimeout);
+
+    // 延遲發送請求（防抖），避免頻繁更新
+    shipmentTimeout = setTimeout(async () => {
+        window.showLoading(true);
+        try {
+            const result = await callAppsScript({ action: 'update', item: JSON.stringify(item) });
+            if (result.success) {
+                window.showNotification('✅ 狀態已更新');
+            } else {
+                window.showNotification('❌ 更新失敗: ' + result.message);
+            }
+        } catch (e) {
+            window.showNotification('❌ 更新錯誤: ' + e.message);
+        } finally {
+            window.showLoading(false);
+            shipmentTimeout = null;
+        }
+    }, 800); // 延遲 800ms 後才發送請求
 }
 
 // 7. UI 控制
