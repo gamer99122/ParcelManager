@@ -1,6 +1,7 @@
 // ===== API 設定 =====
 const SHEET2API_URL = 'https://sheet2api.com/v1/0xbsaNcnQDyd/%25E5%258C%2585%25E8%25A3%25B9%25E6%25B8%2585%25E5%2596%25AE';
 const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz_DRbehgkkpLHZw0kFIVNafkbSJQTynYfkWATSKlYyHnFKPfGjwf57VLvkbR9ltp1o/exec';
+const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 
 // ===== 從 Sheet2API 讀取資料 =====
 async function loadDataFromSheet() {
@@ -48,7 +49,7 @@ async function loadDataFromSheet() {
 async function updateItemToSheet(item) {
     try {
         console.log('正在更新項目到 Google Sheet...');
-        console.log('使用 Google Apps Script 更新');
+        console.log('使用 Google Apps Script + CORS 代理');
         console.log('項目 ID:', item.id);
 
         // 準備更新資料
@@ -67,7 +68,11 @@ async function updateItemToSheet(item) {
 
         console.log('更新資料:', updatePayload);
 
-        const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+        // 使用 CORS 代理
+        const proxyUrl = CORS_PROXY + encodeURIComponent(GOOGLE_APPS_SCRIPT_URL);
+        console.log('代理 URL:', proxyUrl);
+
+        const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -122,7 +127,11 @@ async function deleteItemFromSheet(id) {
 
         console.log('刪除請求:', deletePayload);
 
-        const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+        // 使用 CORS 代理
+        const proxyUrl = CORS_PROXY + encodeURIComponent(GOOGLE_APPS_SCRIPT_URL);
+        console.log('代理 URL:', proxyUrl);
+
+        const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
