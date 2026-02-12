@@ -174,17 +174,25 @@ async function saveEdit(event) {
     try {
         let action = currentEditId !== null ? 'update' : 'write';
         if (currentEditId !== null) itemData.id = currentEditId;
-        
+
+        console.log('✍️ 正在儲存，action:', action);
+        console.log('📝 itemData:', itemData);
+
         const result = await callAppsScript({ action: action, item: JSON.stringify(itemData) });
-        
-        if (result.success) {
+
+        console.log('📋 Google Apps Script 回應:', result);
+
+        if (result && result.success) {
             closeEditModal();
             await loadDataFromSheet();
             window.showNotification('✅ 儲存成功');
         } else {
-            window.showNotification('❌ 儲存失敗: ' + result.message);
+            const errorMsg = result?.message || '未知錯誤';
+            console.error('❌ 儲存失敗:', result);
+            window.showNotification('❌ 儲存失敗: ' + errorMsg);
         }
     } catch (e) {
+        console.error('❌ 捕獲異常:', e);
         window.showNotification('❌ 發生錯誤: ' + e.message);
     } finally {
         window.showLoading(false);
