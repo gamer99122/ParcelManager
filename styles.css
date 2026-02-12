@@ -1,0 +1,308 @@
+/* 自訂樣式 - Bootstrap 補充 */
+
+/* 圖片庫相關 */
+.image-gallery {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    cursor: pointer;
+    align-items: flex-start;
+}
+
+.image-placeholder {
+    width: 140px;
+    height: 140px;
+    background: #f8f9fa;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    font-size: 0.9em;
+    text-align: center;
+    padding: 5px;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.image-placeholder:hover {
+    transform: scale(1.05);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    border-color: #0d6efd;
+}
+
+.image-placeholder img {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 3px;
+    object-fit: cover;
+}
+
+.image-count {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 0.8em;
+    font-weight: 600;
+}
+
+/* 日期顏色 */
+.date {
+    color: #0d6efd;
+    font-weight: 500;
+}
+
+/* 序號樣式 */
+.sequence {
+    background: #e7f1ff;
+    color: #0d6efd;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.9em;
+}
+
+/* 燈箱 */
+.lightbox {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.95);
+    animation: fadeIn 0.3s ease;
+}
+
+.lightbox.show {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.lightbox-close {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    color: white;
+    font-size: 3em;
+    font-weight: bold;
+    cursor: pointer;
+    background: none;
+    border: none;
+    transition: color 0.2s;
+    z-index: 10;
+    padding: 0;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.lightbox-close:hover {
+    color: #ccc;
+}
+
+.lightbox-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.lightbox-image-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 90%;
+    max-height: 80%;
+}
+
+.lightbox-image-wrapper img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 5px;
+}
+
+.lightbox-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
+    border: none;
+    font-size: 3em;
+    padding: 10px 20px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background 0.2s;
+    z-index: 5;
+}
+
+.lightbox-nav:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.lightbox-nav.prev {
+    left: 20px;
+}
+
+.lightbox-nav.next {
+    right: 20px;
+}
+
+.lightbox-counter {
+    position: absolute;
+    bottom: 30px;
+    color: white;
+    font-size: 1.2em;
+    font-weight: 600;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 10px 20px;
+    border-radius: 5px;
+}
+
+/* 通知樣式 */
+@keyframes slideInRight {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+}
+
+/* 表格欄位寬度設定 */
+.shopping-table {
+    table-layout: fixed;
+}
+
+.shopping-table th,
+.shopping-table td {
+    overflow: hidden;
+    word-wrap: break-word;
+}
+
+/* 各欄位寬度比例 */
+.col-date {
+    width: 12%;
+    min-width: 100px;
+}
+
+.col-sequence {
+    width: 8%;
+    min-width: 60px;
+}
+
+.col-image {
+    width: 18%;
+    min-width: 150px;
+}
+
+.col-brand {
+    width: 12%;
+    min-width: 100px;
+}
+
+.col-shipment {
+    width: 12%;
+    min-width: 120px;
+}
+
+.col-notes {
+    width: 25%;
+    min-width: 150px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.col-actions {
+    width: 13%;
+    min-width: 110px;
+}
+
+/* 下拉選單樣式 */
+.shipment-select {
+    min-width: 100px;
+    font-size: 0.9em;
+}
+
+.shipment-select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* 操作按鈕樣式 */
+.actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+    .image-placeholder {
+        width: 100px;
+        height: 100px;
+    }
+
+    .image-count {
+        font-size: 0.7em;
+        padding: 3px 5px;
+    }
+
+    .lightbox-nav {
+        font-size: 2em;
+        padding: 8px 15px;
+    }
+
+    .lightbox-nav.prev {
+        left: 10px;
+    }
+
+    .lightbox-nav.next {
+        right: 10px;
+    }
+
+    .lightbox-close {
+        font-size: 2em;
+        top: 10px;
+        right: 15px;
+    }
+
+    .actions {
+        flex-direction: column;
+        gap: 5px;
+    }
+}
