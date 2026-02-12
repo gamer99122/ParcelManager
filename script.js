@@ -48,46 +48,59 @@ let pendingRequests = {};
 
 function callAppsScript(params) {
     return new Promise((resolve, reject) => {
-        // 防止重複請求
-        const requestKey = params.action + (params.item ? params.item : '');
+        // 防止重複請求 - 使用 Promise 來等待第一次請求的結果
+        const requestKey = params.action + (params.item ? JSON.stringify(params.item) : params.action);
+
         if (pendingRequests[requestKey]) {
-            console.log('⚠️ 重複請求被攔截');
-            return resolve(pendingRequests[requestKey]);
+            console.log('⚠️ 重複請求被攔截，等待第一次請求的結果');
+            // 等待第一次請求完成，返回相同的結果
+            return pendingRequests[requestKey].then(resolve).catch(reject);
         }
 
-        const callbackName = 'jsonp_' + Math.round(100000 * Math.random());
-        window[callbackName] = function(data) {
-            delete window[callbackName];
-            delete pendingRequests[requestKey];
-            const scriptTag = document.getElementById(callbackName);
-            if (scriptTag) document.body.removeChild(scriptTag);
-            resolve(data);
-        };
-
-        params.callback = callbackName;
-        params._t = new Date().getTime();
-        const queryString = new URLSearchParams(params).toString();
-        const url = `${GOOGLE_APPS_SCRIPT_URL}?${queryString}`;
-
-        const script = document.createElement('script');
-        script.id = callbackName;
-        script.src = url;
-        script.onerror = () => {
-            delete window[callbackName];
-            delete pendingRequests[requestKey];
-            reject(new Error('連線失敗'));
-        };
-
-        pendingRequests[requestKey] = true;
-        document.body.appendChild(script);
-
-        setTimeout(() => {
-            if (window[callbackName]) {
+        // 創建 Promise 以供重複請求使用
+        const requestPromise = new Promise((resolveRequest, rejectRequest) => {
+            const callbackName = 'jsonp_' + Math.round(100000 * Math.random());
+            window[callbackName] = function(data) {
                 delete window[callbackName];
+                const scriptTag = document.getElementById(callbackName);
+                if (scriptTag) document.body.removeChild(scriptTag);
+                resolveRequest(data);
+            };
+
+            params.callback = callbackName;
+            params._t = new Date().getTime();
+            const queryString = new URLSearchParams(params).toString();
+            const url = `${GOOGLE_APPS_SCRIPT_URL}?${queryString}`;
+
+            const script = document.createElement('script');
+            script.id = callbackName;
+            script.src = url;
+            script.onerror = () => {
+                delete window[callbackName];
+                rejectRequest(new Error('連線失敗'));
+            };
+
+            document.body.appendChild(script);
+
+            setTimeout(() => {
+                if (window[callbackName]) {
+                    delete window[callbackName];
+                    rejectRequest(new Error('逾時'));
+                }
+            }, 20000);
+        });
+
+        pendingRequests[requestKey] = requestPromise;
+
+        requestPromise
+            .then(result => {
                 delete pendingRequests[requestKey];
-                reject(new Error('逾時'));
-            }
-        }, 20000);
+                resolve(result);
+            })
+            .catch(error => {
+                delete pendingRequests[requestKey];
+                reject(error);
+            });
     });
 }
 
