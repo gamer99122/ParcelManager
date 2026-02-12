@@ -2,49 +2,31 @@
 const SHEET_ID = '1Vv1NVFUnHMyu2998_kzMjiRAVaqW9WRgW7-EUAruRlE';
 const SHEET_NAME = 'Sheet1';
 
-// ===== 處理 GET 請求 (推薦用於避免 CORS 問題) =====
+// ===== 處理 GET 請求 (使用 JSONP 避免 CORS 問題) =====
 function doGet(e) {
   try {
     const action = e.parameter.action;
+    const callback = e.parameter.callback; // JSONP 回呼函數名稱
     
+    let result;
     if (action === 'read') {
-      return readData();
+      result = readData();
     } else if (action === 'update') {
       const item = JSON.parse(e.parameter.item);
-      return updateItem(item);
+      result = updateItem(item);
     } else if (action === 'delete') {
       const id = e.parameter.id;
-      return deleteItem(id);
+      result = deleteItem(id);
     } else if (action === 'write') {
       const item = JSON.parse(e.parameter.item);
-      return addItem(item);
+      result = addItem(item);
+    } else {
+      result = { success: false, message: '不明なアクション' };
     }
     
-    return createResponse(false, '不明なアクション (GET)');
+    return createResponse(result.success, result.message, result.data, callback);
   } catch (error) {
-    return createResponse(false, 'エラー: ' + error.toString());
-  }
-}
-
-// ===== 處理 POST 請求 =====
-function doPost(e) {
-  try {
-    const data = JSON.parse(e.postData.contents);
-    const action = data.action;
-
-    if (action === 'read') {
-      return readData();
-    } else if (action === 'update') {
-      return updateItem(data.item);
-    } else if (action === 'delete') {
-      return deleteItem(data.id);
-    } else if (action === 'write') {
-      return addItem(data.item);
-    }
-
-    return createResponse(false, '不明なアクション (POST)');
-  } catch (error) {
-    return createResponse(false, 'エラー: ' + error.toString());
+    return createResponse(false, 'エラー: ' + error.toString(), null, e.parameter.callback);
   }
 }
 
@@ -53,56 +35,36 @@ function readData() {
   try {
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const data = sheet.getDataRange().getValues();
-    const headers = data[0];
     const rows = data.slice(1);
-    
-    const jsonData = rows.map((row, index) => {
-      return {
-        id: index + 1, // 這裡的 ID 對應資料列索引 (不含標題)
-        date: row[0],
-        sequence: row[1],
-        images: [row[2], row[3], row[4]],
-        brand: row[5],
-        notes: row[6],
-        shipment: row[7]
-      };
-    }).filter(item => item.date || item.sequence); // 過濾掉空行
-    
-    return createResponse(true, '成功讀取資料', jsonData);
+    const jsonData = rows.map((row, index) => ({
+      id: index + 1,
+      date: row[0],
+      sequence: row[1],
+      images: [row[2], row[3], row[4]],
+      brand: row[5],
+      notes: row[6],
+      shipment: row[7]
+    })).filter(item => item.date || item.sequence);
+    return { success: true, message: '成功', data: jsonData };
   } catch (error) {
-    return createResponse(false, '讀取錯誤: ' + error.toString());
+    return { success: false, message: error.toString() };
   }
 }
 
-// ===== アイテムを更新 =====
+// ===== 更新項目 =====
 function updateItem(item) {
   try {
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
-    // 假設 ID 是基於 1 的索引，對應資料列 (第1行是標題，所以 +1)
     const rowNum = parseInt(item.id) + 1; 
-
-    if (isNaN(rowNum) || rowNum < 2) {
-      return createResponse(false, '無效的 ID');
-    }
-
-    const values = [
-      [
-        item.date,
-        item.sequence,
-        item.images[0] || '',
-        item.images[1] || '',
-        item.images[2] || '',
-        item.brand,
-        item.notes,
-        item.shipment
-      ]
-    ];
-
+    const values = [[
+      item.date, item.sequence, 
+      item.images[0] || '', item.images[1] || '', item.images[2] || '',
+      item.brand, item.notes, item.shipment
+    ]];
     sheet.getRange(rowNum, 1, 1, 8).setValues(values);
-
-    return createResponse(true, 'アイテムが更新されました');
+    return { success: true, message: '更新成功' };
   } catch (error) {
-    return createResponse(false, '更新エラー: ' + error.toString());
+    return { success: false, message: error.toString() };
   }
 }
 
@@ -111,48 +73,41 @@ function addItem(item) {
   try {
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const values = [
-      item.date,
-      item.sequence,
-      item.images[0] || '',
-      item.images[1] || '',
-      item.images[2] || '',
-      item.brand,
-      item.notes,
-      item.shipment || '空白'
+      item.date, item.sequence, 
+      item.images[0] || '', item.images[1] || '', item.images[2] || '',
+      item.brand, item.notes, item.shipment || '空白'
     ];
-    
     sheet.appendRow(values);
-    return createResponse(true, '項目已新增');
+    return { success: true, message: '新增成功' };
   } catch (error) {
-    return createResponse(false, '新增錯誤: ' + error.toString());
+    return { success: false, message: error.toString() };
   }
 }
 
-// ===== アイテムを削除 =====
+// ===== 刪除項目 =====
 function deleteItem(id) {
   try {
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const rowNum = parseInt(id) + 1;
-
-    if (isNaN(rowNum) || rowNum < 2) {
-      return createResponse(false, '無效的 ID');
-    }
-
     sheet.deleteRow(rowNum);
-    return createResponse(true, 'アイテムが削除されました');
+    return { success: true, message: '刪除成功' };
   } catch (error) {
-    return createResponse(false, '削除エラー: ' + error.toString());
+    return { success: false, message: error.toString() };
   }
 }
 
-// ===== 響應 JSON 格式 (解決 CORS 且符合 API 規範) =====
-function createResponse(success, message, data = null) {
-  const response = {
-    success: success,
-    message: message,
-    data: data
-  };
-
-  return ContentService.createTextOutput(JSON.stringify(response))
-    .setMimeType(ContentService.MimeType.JSON);
+// ===== 響應 JSONP 格式 (解決所有 CORS 問題) =====
+function createResponse(success, message, data = null, callback = null) {
+  const response = { success: success, message: message, data: data };
+  const json = JSON.stringify(response);
+  
+  if (callback) {
+    // 如果有 callback，回傳 JavaScript 函數調用 (JSONP)
+    return ContentService.createTextOutput(callback + '(' + json + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  } else {
+    // 否則回傳標準 JSON
+    return ContentService.createTextOutput(json)
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 }

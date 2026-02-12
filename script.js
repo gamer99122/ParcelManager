@@ -43,23 +43,49 @@ async function loadDataFromSheet() {
     }
 }
 
-// ===== 通用的 Apps Script 請求函數 (帶代理) =====
-async function callAppsScript(params) {
-    const queryString = new URLSearchParams(params).toString();
-    const targetUrl = `${GOOGLE_APPS_SCRIPT_URL}?${queryString}`;
-    const proxyUrl = `${CORS_PROXY}${encodeURIComponent(targetUrl)}`;
+// ===== 通用的 Apps Script 請求函數 (使用 JSONP) =====
+function callAppsScript(params) {
+    return new Promise((resolve, reject) => {
+        // 建立一個隨機的 callback 名稱
+        const callbackName = 'jsonp_' + Math.round(100000 * Math.random());
+        
+        // 將 callback 函數掛載到 window
+        window[callbackName] = function(data) {
+            delete window[callbackName];
+            document.body.removeChild(script);
+            resolve(data);
+        };
 
-    console.log('正在發送請求到代理...', targetUrl);
+        // 準備參數
+        params.callback = callbackName;
+        const queryString = new URLSearchParams(params).toString();
+        const url = `${GOOGLE_APPS_SCRIPT_URL}?${queryString}`;
 
-    const response = await fetch(proxyUrl);
-    if (!response.ok) throw new Error(`HTTP 錯誤! 狀態碼: ${response.status}`);
-    
-    return await response.json();
+        // 透過 <script> 標籤發送請求 (不受 CORS 限制)
+        const script = document.createElement('script');
+        script.src = url;
+        script.onerror = () => {
+            delete window[callbackName];
+            document.body.removeChild(script);
+            reject(new Error('連線到 Google Script 失敗 (JSONP Error)'));
+        };
+        document.body.appendChild(script);
+
+        // 設定逾時
+        setTimeout(() => {
+            if (window[callbackName]) {
+                delete window[callbackName];
+                document.body.removeChild(script);
+                reject(new Error('請求逾時，請檢查網路或 Apps Script 部署狀態'));
+            }
+        }, 15000);
+    });
 }
 
 // ===== 更新項目到 Google Sheet =====
 async function updateItemToSheet(item) {
     try {
+        console.log('正在透過 JSONP 更新項目...');
         const result = await callAppsScript({
             action: 'update',
             item: JSON.stringify({
@@ -89,6 +115,7 @@ async function updateItemToSheet(item) {
 // ===== 保存新項目到 Google Sheet =====
 async function addItemToSheet(item) {
     try {
+        console.log('正在透過 JSONP 新增項目...');
         const result = await callAppsScript({
             action: 'write',
             item: JSON.stringify(item)
@@ -110,6 +137,7 @@ async function addItemToSheet(item) {
 // ===== 刪除項目 =====
 async function deleteItemFromSheet(id) {
     try {
+        console.log('正在透過 JSONP 刪除項目...');
         const result = await callAppsScript({
             action: 'delete',
             id: id
