@@ -6,40 +6,51 @@ const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 // ===== 從 Google Sheet 讀取資料 =====
 async function loadDataFromSheet() {
     try {
-        console.log('正在從 Google Sheet 讀取資料...');
+        console.log('正在從 Google Sheet 讀取資料 (JSONP 即時模式)...');
 
-        // 恢復使用您原本成功的 Sheet2API 網址
-        const response = await fetch(SHEET2API_URL);
-        const data = await response.json();
+        // 使用 JSONP 直接從 Apps Script 讀取，避開 Sheet2API 的快取問題
+        const result = await callAppsScript({ action: 'read' });
 
-        shoppingList = [];
-
-        if (data && Array.isArray(data)) {
-            data.forEach((row, index) => {
-                // 檢查欄位名稱（Sheet2API 可能會自動處理空格或名稱）
-                const item = {
+        if (result.success && result.data) {
+            shoppingList = result.data.map(item => ({
+                id: item.id,
+                date: String(item.date || ''),
+                sequence: String(item.sequence || ''),
+                images: item.images || ['', '', ''],
+                brand: String(item.brand || ''),
+                notes: String(item.notes || ''),
+                shipment: String(item.shipment || '空白')
+            }));
+            
+            console.log(`成功讀取 ${shoppingList.length} 個項目`);
+            renderPage();
+            showNotification('✅ 資料已成功同步 (最新版本)');
+        } else {
+            throw new Error(result.message || '讀取失敗');
+        }
+    } catch (error) {
+        console.error('讀取錯誤:', error);
+        
+        // 只有在 JSONP 失敗時，才嘗試使用 Sheet2API 作為備援
+        console.warn('JSONP 讀取失敗，嘗試備援方案 (Sheet2API)...');
+        try {
+            const response = await fetch(SHEET2API_URL);
+            const data = await response.json();
+            if (data && Array.isArray(data)) {
+                shoppingList = data.map((row, index) => ({
                     id: index + 1,
                     date: String(row['收件日期'] || row['日期'] || ''),
                     sequence: String(row['序號'] || ''),
-                    images: [
-                        String(row['圖片1'] || ''),
-                        String(row['圖片2'] || ''),
-                        String(row['圖片3'] || '')
-                    ],
+                    images: [String(row['圖片1'] || ''), String(row['圖片2'] || ''), String(row['圖片3'] || '')],
                     brand: String(row['商家'] || row['品牌'] || ''),
                     notes: String(row['備註'] || ''),
                     shipment: String(row['寄送狀態'] || '空白')
-                };
-                shoppingList.push(item);
-            });
+                }));
+                renderPage();
+            }
+        } catch (backupError) {
+            showNotification('❌ 無法連接到資料庫');
         }
-
-        console.log(`成功讀取 ${shoppingList.length} 個項目`);
-        renderPage();
-        showNotification('✅ 資料已成功讀取');
-    } catch (error) {
-        console.error('讀取錯誤:', error);
-        showNotification('❌ 讀取失敗: ' + error.message);
     }
 }
 
