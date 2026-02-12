@@ -171,17 +171,7 @@ async function saveEdit(event) {
 }
 
 async function deleteItem(id) {
-    if (!confirm('確定刪除？')) return;
-    window.showLoading(true);
-    try {
-        const result = await callAppsScript({ action: 'delete', id: id });
-        if (result.success) {
-            await loadDataFromSheet();
-            window.showNotification('✅ 已刪除');
-        }
-    } finally {
-        window.showLoading(false);
-    }
+    window.showNotification('❌ 不提供刪除功能');
 }
 
 async function updateShipment(id, value) {
@@ -268,6 +258,13 @@ function nextImage() {
 
 // 9. 初始化
 document.addEventListener('DOMContentLoaded', () => {
+    // 檢查 URL 參數 add=1，決定是否顯示新增按鈕
+    const params = new URLSearchParams(window.location.search);
+    const addBtn = document.getElementById('addBtn');
+    if (params.get('add') === '1' && addBtn) {
+        addBtn.style.display = 'block';
+    }
+
     loadDataFromSheet();
     document.getElementById('editForm').addEventListener('submit', saveEdit);
 });
